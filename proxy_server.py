@@ -1,3 +1,4 @@
+import os
 import socket
 from threading import Thread
 
@@ -72,6 +73,16 @@ class Proxy(Thread):
 print('dsads')
 main_server= Proxy(fromAdrs, toAdrs, defaultPort)
 
+aux_servers= []
 for port in range(portSpaceLower, portSpaceUpper):
-    aux_server= Proxy(fromAdrs, toAdrs, port)
-    aux_server.start()
+    _aux_server= Proxy(fromAdrs, toAdrs, port)
+    _aux_server.start()
+    aux_servers.append(_aux_server)
+
+while True:
+    # try:
+    cmd= input('$ ')
+    if cmd[:4] == 'exit' or 'quit':
+        os._exit(0)
+    # except Exception e:
+    #     print e
