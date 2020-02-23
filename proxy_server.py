@@ -2,12 +2,12 @@ import os
 import socket
 from threading import Thread
 
-recvSize= 4096
-fromAdrs= '127.0.0.1'
-toAdrs= '127.0.0.1'
-defaultPort= 1234
-portSpaceLower= 3000
-portSpaceUpper= 3009
+RECV_SIZE= 4096
+CLIENT_ADRS= '127.0.0.1'
+SERVER_ADRS= '127.0.0.1'
+MASTER_PORT= 1234
+PORT_SPACE_LOWER= 2000
+PORT_SPACE_UPPER= 9000
 
 class Client2Proxy(Thread):
 
@@ -26,7 +26,7 @@ class Client2Proxy(Thread):
     #to be threaded
     def run(self):
         while True:
-            data= self.client.recv(recvSize)
+            data= self.client.recv(RECV_SIZE)
             if data:
                 print("[{}] -> {}".format(self.port, data[:100].encode('hex')))
                 self.server.sendall(data)
@@ -45,24 +45,24 @@ class Proxy2Server(Thread):
     #to be threaded
     def run(self):
         while True:
-            data= self.server.recv(recvSize)
+            data= self.server.recv(RECV_SIZE)
             if data:
                 print("[{}] -> {}".format(self.port, data[:100].encode('hex')))
                 self.client.sendall(data)
 
 class Proxy(Thread):
 
-    def __init__(self, from_host, to_host, port):
+    def __init__(self, client_adrs, server_adrs, port):
         super(Proxy, self).__init__()
-        self.from_host= from_host
-        self.to_host= to_host
+        self.client_adrs= client_adrs
+        self.server_adrs= server_adrs
         self.port= port
 
     def run(self):
         while True:
             print("[proxy({})] being set up".format(self.port))
-            self.c2p= Client2Proxy(self.from_host, self.port)
-            self.p2s= Proxy2Server(self.to_host, self.port)
+            self.c2p= Client2Proxy(self.client_adrs, self.port)
+            self.p2s= Proxy2Server(self.server_adrs, self.port)
             print("[proxy({})] connection established".format(self.port))
             self.c2p.server= self.p2s.server
             self.p2s.client= self.c2p.client
@@ -70,19 +70,41 @@ class Proxy(Thread):
             self.c2p.start()
             self.p2s.start()
 
+class MasterServer(Thread):
+    availablePorts= []
+    aux_servers= []
+
+    def allocate_aux_server(self, port):
+        _aux_server= Proxy(CLIENT_ADRS, SERVER_ADRS, port)
+        _aux_server.start()
+        self.aux_servers.append(_aux_server)
+
+    def __init__(self):
+        
+        aggregator= Proxy(CLIENT_ADRS, SERVER_ADRS, MASTER_PORT)
+        
+        portsCount= PORT_SPACE_UPPER - PORT_SPACE_LOWER
+        for currentPort in range(portsCount):
+            _available_port= PORT_SPACE_LOWER + currentPort
+            self.availablePorts.append(_available_port)
+
+        self.allocate_aux_server(5005)
+
+
+
+    # def run(self):
+    #     thread.start_new_thread(run_interface,())
+    
+    #console thread
+    def run_interface(self):
+        while True:
+            # try:
+            cmd= input('$ ')
+            if cmd[:4] == 'exit' or 'quit':
+                os._exit(0)
+            # except Exception e:
+            #     print e
+
+
 print('dsads')
-main_server= Proxy(fromAdrs, toAdrs, defaultPort)
-
-aux_servers= []
-for port in range(portSpaceLower, portSpaceUpper):
-    _aux_server= Proxy(fromAdrs, toAdrs, port)
-    _aux_server.start()
-    aux_servers.append(_aux_server)
-
-while True:
-    # try:
-    cmd= input('$ ')
-    if cmd[:4] == 'exit' or 'quit':
-        os._exit(0)
-    # except Exception e:
-    #     print e
+master_server= MasterServer()
